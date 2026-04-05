@@ -1,0 +1,206 @@
+/* Container & Background */
+.about-page-container {
+  width: 100vw;
+  height: 100vh;
+  background: black;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #fff;
+}
+
+.about-background-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 100%);
+}
+
+/* Back Button */
+.back-btn {
+  position: absolute;
+  top: 40px;
+  left: 5%;
+  z-index: 20;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  padding: 8px 20px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background: #fff;
+  color: #000;
+}
+
+/* SpaceX-style Typography */
+.hero-header {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.hero-header h1 {
+  font-size: 5.5rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+}
+
+.hero-header p {
+  font-size: 1.1rem;
+  letter-spacing: 4px;
+  color: #ddd;
+  margin-top: 10px;
+}
+
+/* --- NEW FLEX LAYOUT FOR BUTTONS & CARDS --- */
+
+.about-content-wrapper {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 95%;
+  margin: 0 auto;
+  gap: 30px; /* Space between buttons and cards */
+}
+
+.flashcard-marquee-wrapper {
+  overflow: hidden;
+  flex: 1; /* Allows it to grow and fill the center */
+  max-width: 1320px; /* Ensures we don't see too many cards on huge screens */
+  padding: 40px 0;
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
+.flashcard-track {
+  display: flex;
+  will-change: transform;
+  gap: 40px;
+}
+
+/* The Flashcard */
+.about-flashcard {
+  flex: 0 0 400px;
+  height: 320px;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.about-flashcard:hover {
+  transform: translateY(-10px);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.card-tag {
+  font-size: 0.7rem;
+  color: #888;
+  margin-bottom: 15px;
+  letter-spacing: 3px;
+}
+
+.card-title {
+  font-size: 1.8rem;
+  margin: 0 0 15px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.card-divider {
+  width: 40px;
+  height: 2px;
+  background: #fff;
+  margin-bottom: 20px;
+}
+
+.card-content {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  font-weight: 300;
+  color: #eee;
+}
+
+/* --- SIDE NAVIGATION BUTTONS --- */
+
+.side-nav-btn {
+  background: transparent;
+  width: 60px;
+  height: 100px;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius:35px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  flex-shrink: 0; /* Prevents button from squishing */
+}
+
+.side-nav-btn:hover {
+  background: white;
+  border-color: rgba(255, 255, 255, 0.8);
+  color: #0c0101;
+  transform: scale(1.1);
+}
+
+.side-nav-btn .arrow {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.side-nav-btn span {
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  margin-top: 5px;
+}
+
+/* Animations */
+.prev-btn { animation: bounce-prev 3s infinite ease-in-out; }
+.next-btn { animation: bounce-next 3s infinite ease-in-out; }
+
+@keyframes bounce-prev {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-10px); }
+}
+
+@keyframes bounce-next {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+}
+
+/* Footer */
+.about-mini-footer {
+  position: absolute;
+  bottom: 30px;
+  width: 100%;
+  text-align: center;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  opacity: 0.5;
+}
+
+.about-mini-footer a {
+  color: #fff;
+  text-decoration: none;
+  border-bottom: 1px solid #666;
+}
