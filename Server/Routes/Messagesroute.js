@@ -8,9 +8,9 @@ const router = express.Router();
 
 const verifyStudent = (req, res, next) => {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ Status: false, Error: "Not authenticated" });
+  if (!token) return res.status(401).json({ status: "error", message: "Not authenticated" });
   jwt.verify(token, process.env.JWT_SECRET || "jwt_secret_key", (err, decoded) => {
-    if (err || decoded.role !== "student") return res.status(403).json({ Status: false, Error: "Students only" });
+    if (err || decoded.role !== "student") return res.status(403).json({ status: "error", message: "Students only" });
     req.user = decoded;
     next();
   });
@@ -18,9 +18,9 @@ const verifyStudent = (req, res, next) => {
 
 const verifyAdmin = (req, res, next) => {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ Status: false, Error: "Not authenticated" });
+  if (!token) return res.status(401).json({ status: "error", message: "Not authenticated" });
   jwt.verify(token, process.env.JWT_SECRET || "jwt_secret_key", (err, decoded) => {
-    if (err || decoded.role !== "admin") return res.status(403).json({ Status: false, Error: "Admin only" });
+    if (err || decoded.role !== "admin") return res.status(403).json({ status: "error", message: "Admin only" });
     req.user = decoded;
     next();
   });
@@ -28,9 +28,9 @@ const verifyAdmin = (req, res, next) => {
 
 const verifyAny = (req, res, next) => {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ Status: false, Error: "Not authenticated" });
+  if (!token) return res.status(401).json({ status: "error", message: "Not authenticated" });
   jwt.verify(token, process.env.JWT_SECRET || "jwt_secret_key", (err, decoded) => {
-    if (err) return res.status(403).json({ Status: false, Error: "Invalid token" });
+    if (err) return res.status(403).json({ status: "error", message: "Invalid token" });
     req.user = decoded;
     next();
   });
@@ -44,7 +44,7 @@ router.get('/friends/search', verifyStudent, (req, res) => {
   const { q } = req.query;
   const userId = req.user.id;
   if (!q || q.trim().length < 2) {
-    return res.status(400).json({ Status: false, Error: "Query too short" });
+    return res.status(400).json({ status: "error", message: "Query too short" });
   }
   const sql = `
     SELECT id, name, email, class_grade, section
@@ -55,8 +55,8 @@ router.get('/friends/search', verifyStudent, (req, res) => {
     LIMIT 10
   `;
   con.query(sql, [`%${q}%`, `%${q}%`, userId], (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -81,34 +81,34 @@ router.get('/friends/list', verifyStudent, (req, res) => {
     ORDER BY f.updated_at DESC
   `;
   con.query(sql, [userId, userId, userId, userId, userId, userId], (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    res.json({ status: "success", data: results });
   });
 });
 
 router.post('/friends/request', verifyStudent, (req, res) => {
   const requesterId = req.user.id;
   const { addresseeId } = req.body;
-  if (!addresseeId) return res.status(400).json({ Status: false, Error: "addresseeId required" });
-  if (requesterId === parseInt(addresseeId)) return res.status(400).json({ Status: false, Error: "Cannot add yourself" });
+  if (!addresseeId) return res.status(400).json({ status: "error", message: "addresseeId required" });
+  if (requesterId === parseInt(addresseeId)) return res.status(400).json({ status: "error", message: "Cannot add yourself" });
 
   const checkSql = `
     SELECT id, status FROM friendships
     WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)
   `;
   con.query(checkSql, [requesterId, addresseeId, addresseeId, requesterId], (err, rows) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
     if (rows.length > 0) {
       const existing = rows[0];
-      if (existing.status === 'accepted') return res.status(400).json({ Status: false, Error: "Already friends" });
-      if (existing.status === 'pending')  return res.status(400).json({ Status: false, Error: "Request already sent" });
+      if (existing.status === 'accepted') return res.status(400).json({ status: "error", message: "Already friends" });
+      if (existing.status === 'pending')  return res.status(400).json({ status: "error", message: "Request already sent" });
     }
 
     con.query(
       `INSERT INTO friendships (requester_id, addressee_id, status) VALUES (?, ?, 'pending')`,
       [requesterId, addresseeId],
       (err2) => {
-        if (err2) return res.status(500).json({ Status: false, Error: err2.message });
+        if (err2) return res.status(500).json({ status: "error", message: err2.message });
         con.query(`SELECT name FROM students WHERE id = ?`, [requesterId], (err3, nameRows) => {
           if (!err3 && nameRows.length > 0) {
             createNotification(
@@ -119,7 +119,7 @@ router.post('/friends/request', verifyStudent, (req, res) => {
             );
           }
         });
-        res.json({ Status: true, Message: "Friend request sent" });
+        res.json({ status: "success", Message: "Friend request sent" });
       }
     );
   });
@@ -133,8 +133,8 @@ router.post('/friends/accept/:friendshipId', verifyStudent, (req, res) => {
      WHERE id = ? AND addressee_id = ? AND status = 'pending'`,
     [friendshipId, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Request not found" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Request not found" });
 
       con.query(`SELECT requester_id FROM friendships WHERE id = ?`, [friendshipId], (err2, rows) => {
         if (!err2 && rows.length > 0) {
@@ -151,7 +151,7 @@ router.post('/friends/accept/:friendshipId', verifyStudent, (req, res) => {
         }
       });
 
-      res.json({ Status: true, Message: "Friend request accepted" });
+      res.json({ status: "success", Message: "Friend request accepted" });
     }
   );
 });
@@ -163,9 +163,9 @@ router.delete('/friends/:friendshipId', verifyStudent, (req, res) => {
     `DELETE FROM friendships WHERE id = ? AND (requester_id = ? OR addressee_id = ?)`,
     [friendshipId, userId, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Not found" });
-      res.json({ Status: true, Message: "Removed" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Not found" });
+      res.json({ status: "success", Message: "Removed" });
     }
   );
 });
@@ -183,7 +183,7 @@ router.delete('/friends/:friendshipId', verifyStudent, (req, res) => {
 router.post('/conversations/student', verifyStudent, (req, res) => {
   const userId = req.user.id;
   const { friendId } = req.body;
-  if (!friendId) return res.status(400).json({ Status: false, Error: "friendId required" });
+  if (!friendId) return res.status(400).json({ status: "error", message: "friendId required" });
 
   const friendCheck = `
     SELECT id FROM friendships
@@ -191,8 +191,8 @@ router.post('/conversations/student', verifyStudent, (req, res) => {
       AND ((requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?))
   `;
   con.query(friendCheck, [userId, friendId, friendId, userId], (err, rows) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    if (rows.length === 0) return res.status(403).json({ Status: false, Error: "Not friends" });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    if (rows.length === 0) return res.status(403).json({ status: "error", message: "Not friends" });
 
     const findSql = `
       SELECT id FROM conversations
@@ -201,18 +201,18 @@ router.post('/conversations/student', verifyStudent, (req, res) => {
       LIMIT 1
     `;
     con.query(findSql, [userId, friendId, friendId, userId], (err2, existing) => {
-      if (err2) return res.status(500).json({ Status: false, Error: err2.message });
+      if (err2) return res.status(500).json({ status: "error", message: err2.message });
 
       if (existing.length > 0) {
-        return res.json({ Status: true, ConversationId: existing[0].id });
+        return res.json({ status: "success", ConversationId: existing[0].id });
       }
 
       con.query(
         `INSERT INTO conversations (type, student_id, friend_id) VALUES ('student_student', ?, ?)`,
         [userId, friendId],
         (err3, result) => {
-          if (err3) return res.status(500).json({ Status: false, Error: err3.message });
-          res.json({ Status: true, ConversationId: result.insertId });
+          if (err3) return res.status(500).json({ status: "error", message: err3.message });
+          res.json({ status: "success", ConversationId: result.insertId });
         }
       );
     });
@@ -227,15 +227,15 @@ router.post('/conversations/admin', verifyStudent, (req, res) => {
     `SELECT id FROM conversations WHERE type = 'student_admin' AND student_id = ? LIMIT 1`,
     [userId],
     (err, rows) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (rows.length > 0) return res.json({ Status: true, ConversationId: rows[0].id });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (rows.length > 0) return res.json({ status: "success", ConversationId: rows[0].id });
 
       con.query(
         `INSERT INTO conversations (type, student_id) VALUES ('student_admin', ?)`,
         [userId],
         (err2, result) => {
-          if (err2) return res.status(500).json({ Status: false, Error: err2.message });
-          res.json({ Status: true, ConversationId: result.insertId });
+          if (err2) return res.status(500).json({ status: "error", message: err2.message });
+          res.json({ status: "success", ConversationId: result.insertId });
         }
       );
     }
@@ -276,8 +276,8 @@ router.get('/conversations/list', verifyStudent, (req, res) => {
     ORDER BY last_message_at DESC
   `;
   con.query(sql, [userId, userId, userId, userId, userId], (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -293,8 +293,8 @@ router.get('/conversations/:id/messages', verifyAny, (req, res) => {
   const accessParams = userRole === 'admin' ? [id, userId] : [id, userId, userId];
 
   con.query(accessSql, accessParams, (err, rows) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    if (rows.length === 0) return res.status(403).json({ Status: false, Error: "Access denied" });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    if (rows.length === 0) return res.status(403).json({ status: "error", message: "Access denied" });
 
     const sql = `
       SELECT
@@ -308,7 +308,7 @@ router.get('/conversations/:id/messages', verifyAny, (req, res) => {
       LIMIT 100
     `;
     con.query(sql, [id], (err2, messages) => {
-      if (err2) return res.status(500).json({ Status: false, Error: err2.message });
+      if (err2) return res.status(500).json({ status: "error", message: err2.message });
 
       const markSql = userRole === 'admin'
         ? `UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = 'student' AND is_read = 0`
@@ -316,7 +316,7 @@ router.get('/conversations/:id/messages', verifyAny, (req, res) => {
       const markParams = userRole === 'admin' ? [id] : [id, userId];
       con.query(markSql, markParams);
 
-      res.json({ Status: true, Result: messages });
+      res.json({ status: "success", data: messages });
     });
   });
 });
@@ -330,7 +330,7 @@ router.post('/conversations/:id/messages', verifyAny, (req, res) => {
   const userId = req.user.id;
   const userRole = req.user.role;
 
-  if (!content || !content.trim()) return res.status(400).json({ Status: false, Error: "Message cannot be empty" });
+  if (!content || !content.trim()) return res.status(400).json({ status: "error", message: "Message cannot be empty" });
 
   const accessSql = userRole === 'admin'
     ? `SELECT * FROM conversations WHERE id = ? AND (admin_id = ? OR type = 'student_admin')`
@@ -338,8 +338,8 @@ router.post('/conversations/:id/messages', verifyAny, (req, res) => {
   const accessParams = userRole === 'admin' ? [id, userId] : [id, userId, userId];
 
   con.query(accessSql, accessParams, (err, rows) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    if (rows.length === 0) return res.status(403).json({ Status: false, Error: "Access denied" });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    if (rows.length === 0) return res.status(403).json({ status: "error", message: "Access denied" });
 
     const convo   = rows[0];
     const trimmed = content.trim();
@@ -348,7 +348,7 @@ router.post('/conversations/:id/messages', verifyAny, (req, res) => {
       `INSERT INTO messages (conversation_id, sender_type, sender_id, content) VALUES (?, ?, ?, ?)`,
       [id, userRole, userId, trimmed],
       (err2, result) => {
-        if (err2) return res.status(500).json({ Status: false, Error: err2.message });
+        if (err2) return res.status(500).json({ status: "error", message: err2.message });
 
         // Notify recipients
         if (userRole === 'admin') {
@@ -389,7 +389,7 @@ router.post('/conversations/:id/messages', verifyAny, (req, res) => {
           }
         }
 
-        res.json({ Status: true, MessageId: result.insertId });
+        res.json({ status: "success", MessageId: result.insertId });
       }
     );
   });
@@ -416,8 +416,8 @@ router.get('/admin/conversations', verifyAdmin, (req, res) => {
     ORDER BY last_message_at DESC
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -432,8 +432,8 @@ router.get('/messages/unread-count', verifyStudent, (req, res) => {
       AND NOT (m.sender_type = 'student' AND m.sender_id = ?)
   `;
   con.query(sql, [userId, userId, userId], (err, rows) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Count: rows[0].total });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    res.json({ status: "success", Count: rows[0].total });
   });
 });
 

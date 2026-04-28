@@ -6,7 +6,7 @@ export const con = mysql.createPool({
     password: 'Rahat27.04.11',
     database: 'study',
     waitForConnections: true,
-    connectionLimit: 10,          // max simultaneous connections
+    connectionLimit: 10,          
     queueLimit: 0,
     connectTimeout: 10000
 });

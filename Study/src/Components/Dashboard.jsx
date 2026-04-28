@@ -118,16 +118,16 @@ export default function Dashboard() {
         safe(api.get('/achievements/all')),
       ]);
 
-    const fetchedCourses = coursesRes.data?.Status ? (coursesRes.data.Result || []) : [];
+    const fetchedCourses = coursesRes.data?.status === 'success' ? (coursesRes.data.data || []) : [];
     setCourses(fetchedCourses);
-    if (todayRes.data?.Status) setTodayStats(todayRes.data.Data || { totalMinutes: 0, targetMinutes: 120, percentage: 0, formattedTime: '0H 00M' });
-    const streakResult = streakRes.data?.Status ? (streakRes.data.Data || { currentStreak: 0, weekData: [] }) : { currentStreak: 0, weekData: [] };
+    if (todayRes.data?.status === 'success') setTodayStats(todayRes.data.data || { totalMinutes: 0, targetMinutes: 120, percentage: 0, formattedTime: '0H 00M' });
+    const streakResult = streakRes.data?.status === 'success' ? (streakRes.data.data || { currentStreak: 0, weekData: [] }) : { currentStreak: 0, weekData: [] };
     setStreakData(streakResult);
-    const fetchedHistory = historyRes.data?.Status ? (historyRes.data.Result || []) : [];
+    const fetchedHistory = historyRes.data?.status === 'success' ? (historyRes.data.data || []) : [];
     setSessionHistory(fetchedHistory);
-    if (analyticsRes.data?.Status) setAnalyticsData(analyticsRes.data.Data);
-    if (revisionRes.data?.Status) {
-      const revisions = revisionRes.data.Result || [];
+    if (analyticsRes.data?.status === 'success') setAnalyticsData(analyticsRes.data.data);
+    if (revisionRes.data?.status === 'success') {
+      const revisions = revisionRes.data.data || [];
       setRevisionSessions(revisions);
       setCalendarEvents(revisions.map(r => ({
         id: r.id,
@@ -138,21 +138,16 @@ export default function Dashboard() {
         completed: r.status === 'completed'
       })));
     }
-    if (materialsRes.data?.Status) setMaterials(materialsRes.data.Result || []);
-    if (notificationsRes.data?.Status) {
-      const notifs = notificationsRes.data.Result || [];
+    if (materialsRes.data?.status === 'success') setMaterials(materialsRes.data.data || []);
+    if (notificationsRes.data?.status === 'success') {
+      const notifs = notificationsRes.data.data || [];
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.is_read).length);
     }
-    if (goalsRes.data?.Status) setStudyGoal(goalsRes.data.Result);
+    if (goalsRes.data?.status === 'success') setStudyGoal(goalsRes.data.data);
 
-    // Build trophies from the new single-row achievements design.
-    // The backend returns { keys_earned: [], progress_map: {} }.
-    // keys_earned is a CSV string of earned badge IDs.
-    // progress_map is a JSON object of { badgeId: progressNumber }.
-    // calculateTrophies reads these instead of recomputing from sessions.
-    const achResult = achievementsRes.data?.Status
-      ? (achievementsRes.data.Result || { keys_earned: [], progress_map: {} })
+    const achResult = achievementsRes.data?.status === 'success'
+      ? (achievementsRes.data.data || { keys_earned: [], progress_map: {} })
       : { keys_earned: [], progress_map: {} };
     calculateTrophies(achResult, streakResult.currentStreak);
 
@@ -167,16 +162,16 @@ export default function Dashboard() {
   const fetchFriends = useCallback(async () => {
     try {
       const res = await api.get('/msg/friends/list');
-      if (res.data.Status) setFriends(res.data.Result || []);
+      if (res.data.status === 'success') setFriends(res.data.data || []);
     } catch (err) { console.error('Friends fetch error:', err); }
   }, []);
 
   const fetchConversations = useCallback(async () => {
     try {
       const res = await api.get('/msg/conversations/list');
-      if (res.data.Status) {
-        setConversations(res.data.Result || []);
-        const total = (res.data.Result || []).reduce((acc, c) => acc + (c.unread_count || 0), 0);
+      if (res.data.status === 'success') {
+        setConversations(res.data.data || []);
+        const total = (res.data.data || []).reduce((acc, c) => acc + (c.unread_count || 0), 0);
         setMsgUnreadCount(total);
       }
     } catch (err) { console.error('Conversations fetch error:', err); }
@@ -186,8 +181,8 @@ export default function Dashboard() {
     if (!convId) return;
     try {
       const res = await api.get(`/msg/conversations/${convId}/messages`);
-      if (res.data.Status) {
-        setMessages(res.data.Result || []);
+      if (res.data.status === 'success') {
+        setMessages(res.data.data || []);
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       }
     } catch (err) { console.error('Messages fetch error:', err); }
@@ -214,10 +209,10 @@ export default function Dashboard() {
   const openFriendChat = async (friendId) => {
     try {
       const res = await api.post('/msg/conversations/student', { friendId });
-      if (res.data.Status) {
+      if (res.data.status === 'success') {
         await fetchConversations();
         const allConvs = await api.get('/msg/conversations/list');
-        const conv = (allConvs.data.Result || []).find(c => c.id === res.data.ConversationId);
+        const conv = (allConvs.data.data || []).find(c => c.id === res.data.data.ConversationId);
         if (conv) { setFriendsSubTab('chats'); openConversation(conv); }
       }
     } catch (err) { console.error('Open friend chat error:', err); }
@@ -226,10 +221,10 @@ export default function Dashboard() {
   const openAdminChat = async () => {
     try {
       const res = await api.post('/msg/conversations/admin');
-      if (res.data.Status) {
+      if (res.data.status === 'success') {
         await fetchConversations();
         const allConvs = await api.get('/msg/conversations/list');
-        const conv = (allConvs.data.Result || []).find(c => c.id === res.data.ConversationId);
+        const conv = (allConvs.data.data || []).find(c => c.id === res.data.data.ConversationId);
         if (conv) { setFriendsSubTab('chats'); openConversation(conv); }
       }
     } catch (err) { console.error('Open admin chat error:', err); }
@@ -253,7 +248,7 @@ export default function Dashboard() {
     if (q.length < 2) { setFriendSearchResults([]); return; }
     try {
       const res = await api.get(`/msg/friends/search?q=${encodeURIComponent(q)}`);
-      if (res.data.Status) setFriendSearchResults(res.data.Result || []);
+      if (res.data.status === 'success') setFriendSearchResults(res.data.data || []);
     } catch (err) { console.error('Friend search error:', err); }
   };
 
@@ -262,7 +257,7 @@ export default function Dashboard() {
       await api.post('/msg/friends/request', { addresseeId });
       setFriendSearchResults(prev => prev.filter(s => s.id !== addresseeId));
       fetchFriends();
-    } catch (err) { alert(err.response?.data?.Error || 'Could not send request'); }
+    } catch (err) { alert(err.response?.data?.message || 'Could not send request'); }
   };
 
   const acceptFriend = async (friendshipId) => {
@@ -339,7 +334,7 @@ export default function Dashboard() {
       const payload = { courseCode: currentCourse.code, courseName: currentCourse.name, color: currentCourse.color };
       editingId ? await api.put(`/courses/update/${editingId}`, payload) : await api.post('/courses/add', payload);
       await fetchDashboardData(); setIsModalOpen(false); resetCourseForm();
-    } catch (err) { setError(err.response?.data?.Error || 'Failed to save course'); }
+    } catch (err) { setError(err.response?.data?.message || 'Failed to save course'); }
     finally { setLoading(false); }
   };
   const deleteCourse = async (id) => {
@@ -356,7 +351,7 @@ export default function Dashboard() {
     try {
       editingId ? await api.put(`/revisions/update/${editingId}`, { ...currentRevision }) : await api.post('/revisions/add', { ...currentRevision });
       await fetchDashboardData(); setIsRevisionModalOpen(false); resetRevisionForm();
-    } catch (err) { setError(err.response?.data?.Error || 'Failed to save revision'); }
+    } catch (err) { setError(err.response?.data?.message || 'Failed to save revision'); }
     finally { setLoading(false); }
   };
   const completeRevision = async (id) => { try { await api.post(`/revisions/complete/${id}`); await fetchDashboardData(); } catch (err) { setError('Failed'); } };
@@ -378,7 +373,7 @@ export default function Dashboard() {
         ? await api.put(`/materials/update/${editingId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
         : await api.post('/materials/add', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       await fetchDashboardData(); setIsMaterialModalOpen(false); resetMaterialForm();
-    } catch (err) { setError(err.response?.data?.Error || 'Failed to save material'); }
+    } catch (err) { setError(err.response?.data?.message || 'Failed to save material'); }
     finally { setLoading(false); }
   };
   const deleteMaterial = async (id) => { if (!window.confirm("Delete?")) return; try { await api.delete(`/materials/delete/${id}`); await fetchDashboardData(); } catch (err) { setError('Failed'); } };
@@ -414,7 +409,13 @@ export default function Dashboard() {
   const startSession = async () => {
     try {
       const res = await api.post('/sessions/start', { courseId: selectedCourseForSession || null });
-      if (res.data.Status) { setActiveSession(res.data.SessionId); setSessionStartTime(res.data.StartTime); setTimerSeconds(0); }
+      if (res.data.status === 'success') {
+        setActiveSession(res.data.data.SessionId);
+        setSessionStartTime(res.data.data.StartTime);
+        setTimerSeconds(0);
+      } else {
+        setError(res.data.message || 'Failed to start session');
+      }
     } catch (err) { setError('Failed to start session'); }
   };
   const endSession = async () => {
@@ -476,8 +477,8 @@ export default function Dashboard() {
   const loadProfileData = useCallback(async () => {
     try {
       const res = await api.get('/students/profile');
-      if (res.data.Status) {
-        const s = res.data.Result;
+      if (res.data.status === 'success') {
+        const s = res.data.data;
         setSettingsForm(prev => ({
           ...prev,
           name: s.name || '',
@@ -509,12 +510,12 @@ export default function Dashboard() {
         currentPassword: settingsForm.currentPassword || undefined,
         newPassword: settingsForm.newPassword || undefined,
       });
-      if (res.data.Status) {
+      if (res.data.status === 'success') {
         updateUser({ name: settingsForm.name, email: settingsForm.email });
         setSettingsMessage("Profile updated successfully");
         setSettingsForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
       }
-    } catch (err) { setSettingsError(err.response?.data?.Error || "Failed to update profile"); }
+    } catch (err) { setSettingsError(err.response?.data?.message || "Failed to update profile"); }
     finally { setSettingsLoading(false); }
   };
   const handleDeleteAccount = async () => {

@@ -26,18 +26,15 @@ const Login = () => {
     try {
       const res = await api.post('/auth/login', loginValues);
 
-      if (res.data.loginStatus) {
-        // ── FIXED: use the role the SERVER returned, not an email comparison.
-        // The backend sends role: "admin" | "student" — trust that.
-        const serverRole = res.data.role; // "admin" or "student"
+      if (res.data.status === 'success') {
+        const serverRole = res.data.data.role; // "admin" or "student"
 
         const userData = {
-          id:    res.data.user.id,
-          name:  res.data.user.name,
-          email: res.data.user.email,
-          // Map server role to what AuthContext stores ("admin" | "user")
+          id:    res.data.data.user.id,
+          name:  res.data.data.user.name,
+          email: res.data.data.user.email,
           role:  serverRole === 'admin' ? 'admin' : 'user',
-          token: res.data.token,
+          token: res.data.data.token,
         };
 
         login(userData);
@@ -48,12 +45,11 @@ const Login = () => {
           navigate('/dashboard');
         }
       } else {
-        setLoginError(res.data.Error || 'Login failed');
+        setLoginError(res.data.message || 'Login failed');
       }
     } catch (err) {
       console.error('Login error:', err);
       setLoginError(
-        err.response?.data?.Error ||
         err.response?.data?.message ||
         'Something went wrong. Check console.'
       );
@@ -70,7 +66,7 @@ const Login = () => {
         password: signupValues.password,
       });
 
-      if (res.data.success) {
+      if (res.data.status === 'success') {
         alert('Registration successful! Please log in.');
         setIsActive(false);
         setSignupValues({ name: '', email: '', password: '' });

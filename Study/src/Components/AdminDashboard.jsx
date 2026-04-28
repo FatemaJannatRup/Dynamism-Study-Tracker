@@ -58,7 +58,7 @@ export default function AdminDashboard() {
     const verifyAdmin = async () => {
       try {
         const res = await api.get('/auth/verify');
-        if (res.data.valid && res.data.user.role === 'admin') setIsAdmin(true);
+        if (res.data.status === 'success' && res.data.data?.user?.role === 'admin') setIsAdmin(true);
         else navigate('/dashboard');
       } catch { navigate('/login'); }
     };
@@ -72,25 +72,25 @@ export default function AdminDashboard() {
       const [studentsRes, sessionsRes, coursesRes, revisionsRes,
              materialsRes, notificationsRes, achievementsRes, statsRes, goalsRes] = await Promise.all([
         api.get('/admin/students'),
-        api.get('/admin/sessions').catch(() => ({ data: { Result: [] } })),
-        api.get('/admin/courses').catch(() => ({ data: { Result: [] } })),
-        api.get('/admin/revisions').catch(() => ({ data: { Result: [] } })),
-        api.get('/admin/materials').catch(() => ({ data: { Result: [] } })),
-        api.get('/admin/notifications').catch(() => ({ data: { Result: [] } })),
-        api.get('/admin/achievements').catch(() => ({ data: { Result: [] } })),
-        api.get('/admin/stats').catch(() => ({ data: { Data: {} } })),
-        api.get('/admin/goals').catch(() => ({ data: { Result: [] } }))
+        api.get('/admin/sessions').catch(() => ({ data: { status: 'error', message: 'Sessions load failed', data: [] } })),
+        api.get('/admin/courses').catch(() => ({ data: { status: 'error', message: 'Courses load failed', data: [] } })),
+        api.get('/admin/revisions').catch(() => ({ data: { status: 'error', message: 'Revisions load failed', data: [] } })),
+        api.get('/admin/materials').catch(() => ({ data: { status: 'error', message: 'Materials load failed', data: [] } })),
+        api.get('/admin/notifications').catch(() => ({ data: { status: 'error', message: 'Notifications load failed', data: [] } })),
+        api.get('/admin/achievements').catch(() => ({ data: { status: 'error', message: 'Achievements load failed', data: [] } })),
+        api.get('/admin/stats').catch(() => ({ data: { status: 'error', message: 'Stats load failed', data: {} } })),
+        api.get('/admin/goals').catch(() => ({ data: { status: 'error', message: 'Goals load failed', data: [] } }))
       ]);
 
-      const students    = studentsRes.data.Result     || [];
-      const sessionData = sessionsRes.data.Result     || [];
-      const courseData  = coursesRes.data.Result      || [];
-      const revisionData  = revisionsRes.data.Result  || [];
-      const materialData  = materialsRes.data.Result  || [];
-      const notificationData = notificationsRes.data.Result || [];
-      const achievementData  = achievementsRes.data.Result  || [];
-      const statsData   = statsRes.data.Data          || {};
-      const goalData    = goalsRes.data.Result         || [];
+      const students    = studentsRes.data?.data || [];
+      const sessionData = sessionsRes.data?.data || [];
+      const courseData  = coursesRes.data?.data || [];
+      const revisionData  = revisionsRes.data?.data || [];
+      const materialData  = materialsRes.data?.data || [];
+      const notificationData = notificationsRes.data?.data || [];
+      const achievementData  = achievementsRes.data?.data || [];
+      const statsData   = statsRes.data?.data || {};
+      const goalData    = goalsRes.data?.data || [];
 
       setUsers(students); setSessions(sessionData); setCourses(courseData);
       setRevisions(revisionData); setMaterials(materialData);
@@ -133,8 +133,8 @@ export default function AdminDashboard() {
   const fetchSupportConversations = useCallback(async () => {
     try {
       const res = await api.get('/msg/admin/conversations');
-      if (res.data.Status) {
-        const convs = res.data.Result || [];
+      if (res.data.status === 'success') {
+        const convs = res.data.data || [];
         setSupportConversations(convs);
         setSupportUnread(convs.reduce((acc, c) => acc + (c.unread_count || 0), 0));
       }
@@ -145,8 +145,8 @@ export default function AdminDashboard() {
     if (!convId) return;
     try {
       const res = await api.get(`/msg/conversations/${convId}/messages`);
-      if (res.data.Status) {
-        setSupportMessages(res.data.Result || []);
+      if (res.data.status === 'success') {
+        setSupportMessages(res.data.data || []);
         setTimeout(() => supportEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       }
     } catch (err) { console.error('Support messages error:', err); }

@@ -5,18 +5,21 @@ import { con } from '../utils/db.js';
 
 const router = express.Router();
 
-// ─────────────────────────────────────────────────────
-// Middleware — admin only
-// ─────────────────────────────────────────────────────
+
 const verifyAdmin = (req, res, next) => {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ Status: false, Error: "Not authenticated" });
+  if (!token) {
+    console.log('verifyAdmin message: Not authenticated');
+    return res.status(401).json({ status: "error", message: "Not authenticated" });
+  }
 
   jwt.verify(token, process.env.JWT_SECRET || "jwt_secret_key", (err, decoded) => {
     if (err || decoded.role !== "admin") {
-      return res.status(403).json({ Status: false, Error: "Not authorized (admin only)" });
+      console.log('verifyAdmin message: Not authorized (admin only)', err?.message);
+      return res.status(403).json({ status: "error", message: "Not authorized (admin only)" });
     }
     req.user = decoded;
+    console.log('verifyAdmin success:', { adminId: decoded.id });
     next();
   });
 };
@@ -25,6 +28,7 @@ const verifyAdmin = (req, res, next) => {
 // STATS
 // ─────────────────────────────────────────────────────
 router.get('/stats', verifyAdmin, (req, res) => {
+  console.log('GET /admin/stats request');
   const sql = `
     SELECT
       (SELECT COUNT(*) FROM students)                                   AS totalStudents,
@@ -36,8 +40,12 @@ router.get('/stats', verifyAdmin, (req, res) => {
          FROM study_sessions WHERE DATE(start_time) = CURDATE())        AS activeStudentsToday
   `;
   con.query(sql, (err, rows) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Data: rows[0] });
+    if (err) {
+      console.error('[API] GET /admin/stats message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log('[API] GET /admin/stats success:', rows[0]);
+    res.json({ status: "success", data: rows[0] });
   });
 });
 
@@ -45,37 +53,61 @@ router.get('/stats', verifyAdmin, (req, res) => {
 // STUDENTS
 // ─────────────────────────────────────────────────────
 router.get('/students', verifyAdmin, (req, res) => {
+  console.log('[API] GET /admin/students request');
   const sql = `
     SELECT id, name, email, roll_number, class_grade, section, phone, status, created_at
     FROM students
     ORDER BY created_at DESC
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) {
+      console.error(' GET /admin/students message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log(` GET /admin/students success: Found ${results.length} students`);
+    res.json({ status: "success", data: results });
   });
 });
 
 router.put('/students/:id/status', verifyAdmin, (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+  console.log(`[API] PUT /admin/students/${id}/status request:`, { status });
+  
   const allowed = ['active', 'inactive', 'suspended'];
   if (!allowed.includes(status)) {
-    return res.status(400).json({ Status: false, Error: "Invalid status value" });
+    console.log(`[API] PUT /admin/students/${id}/status message: Invalid status ${status}`);
+    return res.status(400).json({ status: "error", message: "Invalid status value" });
   }
   con.query(`UPDATE students SET status = ? WHERE id = ?`, [status, id], (err, result) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Student not found" });
-    res.json({ Status: true, Message: `Status updated to ${status}` });
+    if (err) {
+      console.error(`[API] PUT /admin/students/${id}/status message:`, err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    if (result.affectedRows === 0) {
+      console.log(`[API] PUT /admin/students/${id}/status message: Student ${id} not found`);
+      return res.status(404).json({ status: "error", message: "Student not found" });
+    }
+    console.log(`[API] PUT /admin/students/${id}/status success: Status updated to ${status}`);
+    res.json({ status: "success", Message: `Status updated to ${status}` });
   });
 });
 
 router.delete('/students/:id', verifyAdmin, (req, res) => {
   const { id } = req.params;
+  console.log(`[API] DELETE /admin/students/${id} request`);
+  
   con.query('DELETE FROM students WHERE id = ?', [id], (err, result) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Student not found" });
-    res.json({ Status: true, Message: "Student and all related data deleted" });
+    if (err) {
+      console.error(`[API] DELETE /admin/students/${id} message:`, err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    if (result.affectedRows === 0) {
+      console.log(`[API] DELETE /admin/students/${id} message: Student ${id} not found`);
+      return res.status(404).json({ status: "error", message: "Student not found" });
+    }
+    console.log(`[API] DELETE /admin/students/${id} success: Student deleted`);
+    res.json({ status: "success", Message: "Student and all related data deleted" });
   });
 });
 
@@ -83,6 +115,7 @@ router.delete('/students/:id', verifyAdmin, (req, res) => {
 // SESSIONS
 // ─────────────────────────────────────────────────────
 router.get('/sessions', verifyAdmin, (req, res) => {
+  console.log('[API] GET /admin/sessions request');
   const sql = `
     SELECT
       s.id, s.student_id, s.course_id, s.start_time, s.end_time,
@@ -96,8 +129,12 @@ router.get('/sessions', verifyAdmin, (req, res) => {
     LIMIT 500
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) {
+      console.error(' GET /admin/sessions message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log(` GET /admin/sessions success: Found ${results.length} sessions`);
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -105,6 +142,7 @@ router.get('/sessions', verifyAdmin, (req, res) => {
 // COURSES
 // ─────────────────────────────────────────────────────
 router.get('/courses', verifyAdmin, (req, res) => {
+  console.log(' GET /admin/courses request');
   const sql = `
     SELECT
       c.id, c.student_id, c.course_code, c.course_name, c.color, c.status, c.created_at,
@@ -115,8 +153,12 @@ router.get('/courses', verifyAdmin, (req, res) => {
     ORDER BY c.created_at DESC
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) {
+      console.error(' GET /admin/courses message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log(` GET /admin/courses success: Found ${results.length} courses`);
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -124,6 +166,7 @@ router.get('/courses', verifyAdmin, (req, res) => {
 // REVISION SESSIONS
 // ─────────────────────────────────────────────────────
 router.get('/revisions', verifyAdmin, (req, res) => {
+  console.log(' GET /admin/revisions request');
   const sql = `
     SELECT
       r.id, r.student_id, r.course_id, r.title, r.scheduled_date,
@@ -136,8 +179,12 @@ router.get('/revisions', verifyAdmin, (req, res) => {
     ORDER BY r.scheduled_date DESC
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) {
+      console.error(' GET /admin/revisions message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log(` GET /admin/revisions success: Found ${results.length} revisions`);
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -145,6 +192,7 @@ router.get('/revisions', verifyAdmin, (req, res) => {
 // STUDY MATERIALS
 // ─────────────────────────────────────────────────────
 router.get('/materials', verifyAdmin, (req, res) => {
+  console.log(' GET /admin/materials request');
   const sql = `
     SELECT
       m.id, m.student_id, m.course_id, m.title, m.type, m.url, m.description, m.uploaded_at,
@@ -156,8 +204,12 @@ router.get('/materials', verifyAdmin, (req, res) => {
     ORDER BY m.uploaded_at DESC
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) {
+      console.error(' GET /admin/materials message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log(` GET /admin/materials success: Found ${results.length} materials`);
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -166,6 +218,7 @@ router.get('/materials', verifyAdmin, (req, res) => {
 // Returns parsed progress_map and keys_earned array for each student
 // ─────────────────────────────────────────────────────
 router.get('/achievements', verifyAdmin, (req, res) => {
+  console.log(' GET /admin/achievements request');
   const sql = `
     SELECT
       a.id,
@@ -179,7 +232,10 @@ router.get('/achievements', verifyAdmin, (req, res) => {
     ORDER BY a.updated_at DESC
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
+    if (err) {
+      console.error(' GET /admin/achievements message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
 
     // Parse keys_earned into an array for convenience
     const formatted = results.map(row => ({
@@ -190,7 +246,8 @@ router.get('/achievements', verifyAdmin, (req, res) => {
       progress_map: row.progress_map || {}
     }));
 
-    res.json({ Status: true, Result: formatted });
+    console.log(` GET /admin/achievements success: Found ${formatted.length} achievement records`);
+    res.json({ status: "success", data: formatted });
   });
 });
 
@@ -198,6 +255,7 @@ router.get('/achievements', verifyAdmin, (req, res) => {
 // STUDY GOALS
 // ─────────────────────────────────────────────────────
 router.get('/goals', verifyAdmin, (req, res) => {
+  console.log(' GET /admin/goals request');
   const sql = `
     SELECT
       g.id, g.student_id, g.type, g.target_minutes, g.period_start, g.period_end, g.created_at,
@@ -215,8 +273,12 @@ router.get('/goals', verifyAdmin, (req, res) => {
     LIMIT 500
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) {
+      console.error(' GET /admin/goals message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log(` GET /admin/goals success: Found ${results.length} goals`);
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -224,6 +286,7 @@ router.get('/goals', verifyAdmin, (req, res) => {
 // NOTIFICATIONS
 // ─────────────────────────────────────────────────────
 router.get('/notifications', verifyAdmin, (req, res) => {
+  console.log(' GET /admin/notifications request');
   const sql = `
     SELECT
       n.id, n.student_id, n.title, n.message, n.type, n.is_read, n.created_at,
@@ -234,8 +297,12 @@ router.get('/notifications', verifyAdmin, (req, res) => {
     LIMIT 200
   `;
   con.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) {
+      console.error(' GET /admin/notifications message:', err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    console.log(` GET /admin/notifications success: Found ${results.length} notifications`);
+    res.json({ status: "success", data: results });
   });
 });
 

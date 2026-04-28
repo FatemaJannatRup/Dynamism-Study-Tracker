@@ -14,7 +14,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ loginStatus: false, Error: "Email and password required" });
+    return res.status(400).json({ status: 'error', message: 'Email and password required' });
   }
 
   try {
@@ -29,7 +29,7 @@ router.post('/login', async (req, res) => {
       const admin = adminResult[0];
       const match = await bcrypt.compare(password, admin.password);
       if (!match) {
-        return res.status(401).json({ loginStatus: false, Error: "Invalid credentials" });
+        return res.status(401).json({ status: 'error', message: "Invalid credentials" });
       }
 
       const token = jwt.sign(
@@ -45,12 +45,10 @@ router.post('/login', async (req, res) => {
         maxAge: 24 * 60 * 60 * 1000
       });
 
-      // FIX: token is now included in the response so the frontend can store it
       return res.json({
-        loginStatus: true,
-        role: "admin",
-        token,
-        user: { id: admin.id, name: admin.name || "Admin", email: admin.email }
+        status: 'success',
+        message: 'Logged in successfully',
+        data: { role: "admin", token, user: { id: admin.id, name: admin.name || "Admin", email: admin.email } }
       });
     }
 
@@ -67,7 +65,7 @@ router.post('/login', async (req, res) => {
       const student = studentResult[0];
       const match = await bcrypt.compare(password, student.password);
       if (!match) {
-        return res.status(401).json({ loginStatus: false, Error: "Invalid credentials" });
+        return res.status(401).json({ status: 'error', message: "Invalid credentials" });
       }
 
       const token = jwt.sign(
@@ -83,26 +81,18 @@ router.post('/login', async (req, res) => {
         maxAge: 24 * 60 * 60 * 1000
       });
 
-      // FIX: token is now included in the response
       return res.json({
-        loginStatus: true,
-        role: "student",
-        token,
-        user: {
-          id: student.id,
-          name: student.name,
-          email: student.email,
-          roll_number: student.roll_number,
-          class_grade: student.class_grade
-        }
+        status: 'success',
+        message: 'Logged in successfully',
+        data: { role: "student", token, user: { id: student.id, name: student.name, email: student.email, roll_number: student.roll_number, class_grade: student.class_grade } }
       });
     }
 
-    return res.status(401).json({ loginStatus: false, Error: "Invalid credentials" });
+    return res.status(401).json({ status: 'error', message: 'Invalid credentials' });
 
   } catch (err) {
     console.error('Login error:', err);
-    return res.status(500).json({ loginStatus: false, Error: "Server error" });
+    return res.status(500).json({ status: 'error', message: "Server error" });
   }
 });
 
@@ -113,16 +103,16 @@ router.post('/register', async (req, res) => {
   const { name, email, password, roll_number, class_grade, section, phone } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ success: false, message: "Name, email and password are required" });
+    return res.status(400).json({ status: "error", message: "Name, email and password are required" });
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    return res.status(400).json({ success: false, message: "Invalid email format" });
+    return res.status(400).json({ status: "error", message: "Invalid email format" });
   }
 
   if (password.length < 6) {
-    return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+    return res.status(400).json({ status: "error", message: "Password must be at least 6 characters" });
   }
 
   try {
@@ -138,7 +128,7 @@ router.post('/register', async (req, res) => {
     });
 
     if (checkResult.length > 0) {
-      return res.status(409).json({ success: false, message: "Email already registered" });
+      return res.status(409).json({ status: "error", message: "Email already registered" });
     }
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
@@ -169,9 +159,9 @@ router.post('/register', async (req, res) => {
   } catch (err) {
     console.error('Registration error:', err);
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ success: false, message: "Email already registered" });
+      return res.status(409).json({ status: "error", message: "Email already registered" });
     }
-    return res.status(500).json({ success: false, message: "Registration failed. Please try again." });
+    return res.status(500).json({ status: "error", message: "Registration failed. Please try again." });
   }
 });
 
@@ -180,7 +170,7 @@ router.post('/register', async (req, res) => {
 // ─────────────────────────────────────────────────────
 router.post('/logout', (req, res) => {
   res.clearCookie('token');
-  return res.json({ success: true, message: "Logged out" });
+  return res.json({ status: 'success', message: "Logged out" });
 });
 
 // ─────────────────────────────────────────────────────
@@ -188,11 +178,11 @@ router.post('/logout', (req, res) => {
 // ─────────────────────────────────────────────────────
 router.get('/verify', (req, res) => {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ valid: false, message: "No token" });
+  if (!token) return res.status(401).json({ status: 'error', message: "No token" });
 
   jwt.verify(token, process.env.JWT_SECRET || "jwt_secret_key", (err, decoded) => {
-    if (err) return res.status(401).json({ valid: false, message: "Invalid or expired token" });
-    return res.json({ valid: true, user: decoded });
+    if (err) return res.status(401).json({ status: 'error', message: "Invalid or expired token" });
+    return res.json({ status: 'success', message: 'Token valid', data: { user: decoded } });
   });
 });
 

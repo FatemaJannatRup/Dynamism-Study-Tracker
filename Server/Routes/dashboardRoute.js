@@ -39,13 +39,18 @@ const upload = multer({
 // ─────────────────────────────────────────────────────
 const verifyUser = (req, res, next) => {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ Status: false, Error: "Not authenticated" });
+  if (!token) {
+    console.log('verifyUser message: Not authenticated');
+    return res.status(401).json({ status: "error", message: "Not authenticated" });
+  }
 
   jwt.verify(token, process.env.JWT_SECRET || "jwt_secret_key", (err, decoded) => {
     if (err || decoded.role !== "student") {
-      return res.status(403).json({ Status: false, Error: "Not authorized (student only)" });
+      console.log('verifyUser message: Not authorized (student only)', err?.message);
+      return res.status(403).json({ status: "error", message: "Not authorized (student only)" });
     }
     req.user = decoded;
+    console.log('verifyUser success:', { userId: decoded.id });
     next();
   });
 };
@@ -59,13 +64,21 @@ router.use(verifyUser);
 // GET — fetch current profile so the settings form can pre-populate
 router.get('/students/profile', (req, res) => {
   const userId = req.user.id;
+  console.log(` request`, { userId });
   con.query(
     `SELECT id, name, email, roll_number, class_grade, section, phone FROM students WHERE id = ?`,
     [userId],
     (err, rows) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (rows.length === 0) return res.status(404).json({ Status: false, Error: "User not found" });
-      res.json({ Status: true, Result: rows[0] });
+      if (err) {
+        console.error(`message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
+      if (rows.length === 0) {
+        console.log(`message: User ${userId} not found`);
+        return res.status(404).json({ status: "error", message: "User not found" });
+      }
+      console.log(`success:`, rows[0]);
+      res.json({ status: "success", message: "Profile retrieved successfully", data: rows[0] });
     }
   );
 });
@@ -73,9 +86,11 @@ router.get('/students/profile', (req, res) => {
 router.put('/students/profile', async (req, res) => {
   const userId = req.user.id;
   const { name, email, roll_number, class_grade, section, phone, currentPassword, newPassword } = req.body;
+  console.log(`request`, { userId, name, email, hasNewPassword: !!newPassword });
 
   if (!name || !email) {
-    return res.status(400).json({ Status: false, Error: "Name and email are required" });
+    console.log(`message: Name and email required`);
+    return res.status(400).json({ status: "error", message: "Name and email are required" });
   }
 
   try {
@@ -84,7 +99,8 @@ router.put('/students/profile', async (req, res) => {
 
     if (newPassword) {
       if (!currentPassword) {
-        return res.status(400).json({ Status: false, Error: "Current password required to set a new one" });
+        console.log(`message: Current password required`);
+        return res.status(400).json({ status: "error", message: "Current password required to set a new one" });
       }
       const user = await new Promise((resolve, reject) => {
         con.query("SELECT password FROM students WHERE id = ?", [userId], (err, rows) => {
@@ -93,10 +109,14 @@ router.put('/students/profile', async (req, res) => {
         });
       });
       const match = await bcrypt.compare(currentPassword, user.password);
-      if (!match) return res.status(401).json({ Status: false, Error: "Current password incorrect" });
+      if (!match) {
+        console.log(`message: Current password incorrect`);
+        return res.status(401).json({ status: "error", message: "Current password incorrect" });
+      }
       const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
       sql += ', password = ?';
       params.push(hashed);
+      console.log(`message: Password updated`);
     }
 
     sql += ' WHERE id = ?';
@@ -109,25 +129,35 @@ router.put('/students/profile', async (req, res) => {
     });
 
     if (dbResult.affectedRows === 0) {
-      return res.status(404).json({ Status: false, Error: "User not found" });
+      console.log(`message: User ${userId} not found`);
+      return res.status(404).json({ status: "error", message: "User not found" });
     }
 
+    console.log(`message: Profile updated`);
     createNotification(userId, 'Profile Updated', 'Your profile was updated successfully.', 'system');
-    res.json({ Status: true, Message: "Profile updated successfully" });
+    res.json({ status: "success", message: "Profile updated successfully" });
 
   } catch (err) {
-    console.error('Profile update error:', err);
-    res.status(500).json({ Status: false, Error: "Server error" });
+    console.error('message:', err.message);
+    res.status(500).json({ status: "error", message: "Server error" });
   }
 });
 
 router.delete('/students/account', (req, res) => {
   const userId = req.user.id;
+  console.log(` request`, { userId });
   con.query('DELETE FROM students WHERE id = ?', [userId], (err, result) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "User not found" });
+    if (err) {
+      console.error(`message:`, err.message);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+    if (result.affectedRows === 0) {
+      console.log(`message: User ${userId} not found`);
+      return res.status(404).json({ status: "error", message: "User not found" });
+    }
+    console.log(`message: Account deleted`);
     res.clearCookie('token');
-    res.json({ Status: true, Message: "Account deleted" });
+    res.json({ status: "success", message: "Account deleted successfully" });
   });
 });
 
@@ -136,14 +166,19 @@ router.delete('/students/account', (req, res) => {
 // ─────────────────────────────────────────────────────
 router.get('/courses/all', (req, res) => {
   const userId = req.user.id;
+  console.log(`request`, { userId });
   con.query(
     `SELECT id, course_code, course_name, color
      FROM courses WHERE student_id = ? AND status = 'active'
      ORDER BY course_name`,
     [userId],
     (err, results) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      res.json({ Status: true, Result: results });
+      if (err) {
+        console.error(`message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
+      console.log(`message: Found ${results.length} courses`);
+      res.json({ status: "success", message: "Courses retrieved successfully", data: results });
     }
   );
 });
@@ -151,9 +186,11 @@ router.get('/courses/all', (req, res) => {
 router.post('/courses/add', (req, res) => {
   const userId = req.user.id;
   const { courseCode, courseName, color } = req.body;
+  console.log( { userId , courseCode, courseName, color });
 
   if (!courseCode || !courseName) {
-    return res.status(400).json({ Status: false, Error: "Course code and name required" });
+    console.log(` message: Course code and name required`);
+    return res.status(400).json({ status: "error", message: "Course code and name required" });
   }
 
   con.query(
@@ -162,12 +199,15 @@ router.post('/courses/add', (req, res) => {
     (err, result) => {
       if (err) {
         if (err.code === 'ER_DUP_ENTRY') {
-          return res.status(400).json({ Status: false, Error: "Course code already exists" });
+          console.log(` message: Course code already exists`);
+          return res.status(400).json({ status: "error", message: "Course code already exists" });
         }
-        return res.status(500).json({ Status: false, Error: err.message });
+        console.error(` message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
       }
+      console.log(`message: Course added with ID ${result.insertId}`);
       createNotification(userId, 'Course Added', `${courseName} has been added to your courses.`, 'system');
-      res.json({ Status: true, Result: { id: result.insertId } });
+      res.json({ status: "success", message: "Course added successfully", data: { id: result.insertId, course_name: courseName } });
     }
   );
 });
@@ -176,15 +216,23 @@ router.put('/courses/update/:id', (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;
   const { courseCode, courseName, color } = req.body;
+  console.log(` ${id} request`, { userId, id, courseCode, courseName, color });
 
   con.query(
     `UPDATE courses SET course_code = ?, course_name = ?, color = ?
      WHERE id = ? AND student_id = ?`,
     [courseCode.toUpperCase(), courseName.trim(), color, id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Course not found" });
-      res.json({ Status: true, Message: "Course updated" });
+      if (err) {
+        console.error(`${id} message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
+      if (result.affectedRows === 0) {
+        console.log(`${id} message: Course not found`);
+        return res.status(404).json({ status: "error", message: "Course not found" });
+      }
+      console.log(`${id} message: Course updated`);
+      res.json({ status: "success", message: "Course updated successfully" });
     }
   );
 });
@@ -192,13 +240,22 @@ router.put('/courses/update/:id', (req, res) => {
 router.delete('/courses/delete/:id', (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;
+  console.log(` ${id} request`, { userId, id });
+
   con.query(
     `DELETE FROM courses WHERE id = ? AND student_id = ?`,
     [id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Course not found" });
-      res.json({ Status: true, Message: "Course deleted" });
+      if (err) {
+        console.error(`${id} message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
+      if (result.affectedRows === 0) {
+        console.log(`${id} message: Course not found`);
+        return res.status(404).json({ status: "error", message: "Course not found" });
+      }
+      console.log(`${id} message: Course deleted`);
+      res.json({ status: "success", message: "Course deleted successfully" });
     }
   );
 });
@@ -209,13 +266,18 @@ router.delete('/courses/delete/:id', (req, res) => {
 router.post('/sessions/start', (req, res) => {
   const userId = req.user.id;
   const { courseId } = req.body;
+  console.log(`POST /dashboard/sessions/start request`, { userId, courseId });
 
   con.query(
     `INSERT INTO study_sessions (student_id, course_id, start_time, status) VALUES (?, ?, NOW(), 'active')`,
     [userId, courseId || null],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      res.json({ Status: true, SessionId: result.insertId, StartTime: new Date().toISOString() });
+      if (err) {
+        console.error(` message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
+      console.log(`message: Session ${result.insertId} started`);
+      res.json({ status: "success", message: "Session started successfully", data: { sessionId: result.insertId, startTime: new Date().toISOString() } });
     }
   );
 });
@@ -224,15 +286,23 @@ router.post('/sessions/end/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   const { notes = '' } = req.body;
   const userId = req.user.id;
+  console.log(`${sessionId} request`, { userId, sessionId, notes });
 
   con.query(
     `SELECT start_time FROM study_sessions WHERE id = ? AND status = 'active'`,
     [sessionId],
     (err, rows) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (rows.length === 0) return res.status(400).json({ Status: false, Error: "Session not found or already ended" });
+      if (err) {
+        console.error(`${sessionId} message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
+      if (rows.length === 0) {
+        console.log(`${sessionId} message: Session not found or already ended`);
+        return res.status(400).json({ status: "error", message: "Session not found or already ended" });
+      }
 
       const durationMinutes = Math.max(1, Math.round((Date.now() - new Date(rows[0].start_time)) / 1000 / 60));
+      console.log(`${sessionId}: Duration calculated: ${durationMinutes} minutes`);
 
       con.query(
         `UPDATE study_sessions
@@ -240,8 +310,12 @@ router.post('/sessions/end/:sessionId', (req, res) => {
          WHERE id = ?`,
         [durationMinutes, notes, sessionId],
         (err2) => {
-          if (err2) return res.status(500).json({ Status: false, Error: err2.message });
+          if (err2) {
+            console.error(`${sessionId} message:`, err2.message);
+            return res.status(500).json({ status: "error", message: err2.message });
+          }
 
+          console.log(`${sessionId}: Session completed, ${durationMinutes} minutes`);
           updateAchievements(userId);
           // NOTE: updateGoalProgress removed — current_progress no longer stored in DB
           // Goal progress is now computed live from study_sessions
@@ -259,7 +333,7 @@ router.post('/sessions/end/:sessionId', (req, res) => {
           // Check if daily goal was just reached and notify
           checkAndNotifyGoal(userId);
 
-          res.json({ Status: true, DurationMinutes: durationMinutes });
+          res.json({ status: "success", message: "Session ended successfully", data: { durationMinutes } });
         }
       );
     }
@@ -269,6 +343,7 @@ router.post('/sessions/end/:sessionId', (req, res) => {
 router.get('/sessions/history', (req, res) => {
   const userId = req.user.id;
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  console.log(` GET /dashboard/sessions/history request`, { userId, limit });
 
   con.query(
     `SELECT s.id, s.start_time, s.end_time, s.duration_minutes, s.course_id, c.course_code
@@ -279,8 +354,12 @@ router.get('/sessions/history', (req, res) => {
      LIMIT ?`,
     [userId, limit],
     (err, results) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      res.json({ Status: true, Result: results });
+      if (err) {
+        console.error(` message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
+      console.log(` success: Found ${results.length} sessions`);
+      res.json({ status: "success", message: "Session history retrieved successfully", data: results });
     }
   );
 });
@@ -288,6 +367,7 @@ router.get('/sessions/history', (req, res) => {
 router.get('/sessions/today', (req, res) => {
   const userId = req.user.id;
   const today  = new Date().toISOString().split('T')[0];
+  console.log(`GET /dashboard/sessions/today request`, { userId, today });
 
   con.query(
     `SELECT COALESCE(SUM(duration_minutes), 0) AS total_minutes
@@ -295,7 +375,10 @@ router.get('/sessions/today', (req, res) => {
      WHERE student_id = ? AND DATE(start_time) = CURDATE() AND status = 'completed'`,
     [userId],
     (err, minuteRows) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) {
+        console.error(` message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
       const minutes = minuteRows[0]?.total_minutes || 0;
 
       // Use the student's actual saved goal target — not hardcoded 120
@@ -305,11 +388,16 @@ router.get('/sessions/today', (req, res) => {
          LIMIT 1`,
         [userId, today],
         (err2, goalRows) => {
-          if (err2) return res.status(500).json({ Status: false, Error: err2.message });
+          if (err2) {
+            console.error(` message:`, err2.message);
+            return res.status(500).json({ status: "error", message: err2.message });
+          }
           const target = goalRows.length > 0 ? goalRows[0].target_minutes : 120;
+          console.log(`success: ${minutes}/${target} minutes`);
           res.json({
-            Status: true,
-            Data: {
+            status: "success",
+            message: "Today's session data retrieved successfully",
+            data: {
               totalMinutes:  minutes,
               targetMinutes: target,
               percentage:    Math.min(100, Math.round((minutes / target) * 100)),
@@ -324,6 +412,7 @@ router.get('/sessions/today', (req, res) => {
 
 router.get('/sessions/streaks', (req, res) => {
   const userId = req.user.id;
+  console.log(`GET /dashboard/sessions/streaks request`, { userId });
 
   con.query(
     `SELECT DATE(start_time) AS date, SUM(duration_minutes) AS minutes
@@ -335,7 +424,10 @@ router.get('/sessions/streaks', (req, res) => {
      ORDER BY date DESC`,
     [userId],
     (err, rows) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) {
+        console.error(` message:`, err.message);
+        return res.status(500).json({ status: "error", message: err.message });
+      }
 
       const weekData = [];
       let currentStreak = 0;
@@ -353,7 +445,8 @@ router.get('/sessions/streaks', (req, res) => {
         else if (i > 0 && hit && currentStreak === i) currentStreak++;
       }
 
-      res.json({ Status: true, Data: { currentStreak, weekData } });
+      console.log(`GET /dashboard/sessions/streaks success: Current streak ${currentStreak} days`);
+      res.json({ status: "success", data: { currentStreak, weekData } });
     }
   );
 });
@@ -370,8 +463,8 @@ router.get('/revisions/all', (req, res) => {
      ORDER BY scheduled_date ASC, priority DESC`,
     [userId],
     (err, results) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      res.json({ Status: true, Result: results });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      res.json({ status: "success", data: results });
     }
   );
 });
@@ -381,7 +474,7 @@ router.post('/revisions/add', (req, res) => {
   const { courseId, title, scheduledDate, duration, priority } = req.body;
 
   if (!title || !scheduledDate) {
-    return res.status(400).json({ Status: false, Error: "Title and scheduled date required" });
+    return res.status(400).json({ status: "error", message: "Title and scheduled date required" });
   }
 
   con.query(
@@ -389,9 +482,9 @@ router.post('/revisions/add', (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
     [userId, courseId || null, title.trim(), scheduledDate, duration || 60, priority || 'medium'],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
       createNotification(userId, 'Revision Scheduled', `"${title}" has been added to your calendar.`, 'reminder');
-      res.json({ Status: true, Result: { id: result.insertId } });
+      res.json({ status: "success", data: { id: result.insertId } });
     }
   );
 });
@@ -407,9 +500,9 @@ router.put('/revisions/update/:id', (req, res) => {
      WHERE id = ? AND student_id = ?`,
     [courseId || null, title?.trim(), scheduledDate, duration, priority, id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Not found" });
-      res.json({ Status: true, Message: "Revision updated" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Not found" });
+      res.json({ status: "success", message: "Revision updated" });
     }
   );
 });
@@ -423,10 +516,10 @@ router.post('/revisions/complete/:id', (req, res) => {
      WHERE id = ? AND student_id = ?`,
     [id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Not found" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Not found" });
       createNotification(userId, 'Revision Complete', 'Nice work completing a revision session!', 'system');
-      res.json({ Status: true, Message: "Marked complete" });
+      res.json({ status: "success", message: "Marked complete" });
     }
   );
 });
@@ -438,9 +531,9 @@ router.delete('/revisions/delete/:id', (req, res) => {
     `DELETE FROM revision_sessions WHERE id = ? AND student_id = ?`,
     [id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Not found" });
-      res.json({ Status: true, Message: "Deleted" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Not found" });
+      res.json({ status: "success", message: "Deleted" });
     }
   );
 });
@@ -464,8 +557,8 @@ router.get('/materials/all', (req, res) => {
   sql += ` ORDER BY m.uploaded_at DESC`;
 
   con.query(sql, params, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -475,7 +568,7 @@ router.post('/materials/add', upload.single('file'), (req, res) => {
   const finalUrl = req.file ? `/uploads/materials/${req.file.filename}` : url;
 
   if (!title || !type || !finalUrl) {
-    return res.status(400).json({ Status: false, Error: "Title, type and URL/file are required" });
+    return res.status(400).json({ status: "error", message: "Title, type and URL/file are required" });
   }
 
   con.query(
@@ -483,9 +576,9 @@ router.post('/materials/add', upload.single('file'), (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?)`,
     [courseId || null, userId, title.trim(), type, finalUrl, description || null],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
       createNotification(userId, 'Material Uploaded', `"${title}" has been added to your materials.`, 'system');
-      res.json({ Status: true, Result: { id: result.insertId } });
+      res.json({ status: "success", data: { id: result.insertId } });
     }
   );
 });
@@ -500,9 +593,9 @@ router.put('/materials/update/:id', (req, res) => {
      WHERE id = ? AND student_id = ?`,
     [courseId || null, title?.trim(), type, url, description, id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Not found" });
-      res.json({ Status: true, Message: "Material updated" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Not found" });
+      res.json({ status: "success", message: "Material updated" });
     }
   );
 });
@@ -514,9 +607,9 @@ router.delete('/materials/delete/:id', (req, res) => {
     `DELETE FROM study_materials WHERE id = ? AND student_id = ?`,
     [id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Not found" });
-      res.json({ Status: true, Message: "Deleted" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Not found" });
+      res.json({ status: "success", message: "Deleted" });
     }
   );
 });
@@ -535,8 +628,8 @@ router.get('/notifications/all', (req, res) => {
   sql += ` ORDER BY created_at DESC LIMIT 50`;
 
   con.query(sql, params, (err, results) => {
-    if (err) return res.status(500).json({ Status: false, Error: err.message });
-    res.json({ Status: true, Result: results });
+    if (err) return res.status(500).json({ status: "error", message: err.message });
+    res.json({ status: "success", data: results });
   });
 });
 
@@ -547,8 +640,8 @@ router.post('/notifications/mark-read/:id', (req, res) => {
     `UPDATE notifications SET is_read = 1 WHERE id = ? AND student_id = ?`,
     [id, userId],
     (err) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      res.json({ Status: true, Message: "Marked as read" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      res.json({ status: "success", message: "Marked as read" });
     }
   );
 });
@@ -559,8 +652,8 @@ router.post('/notifications/mark-all-read', (req, res) => {
     `UPDATE notifications SET is_read = 1 WHERE student_id = ? AND is_read = 0`,
     [userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      res.json({ Status: true, Message: "All marked as read", Count: result.affectedRows });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      res.json({ status: "success", message: "All marked as read", Count: result.affectedRows });
     }
   );
 });
@@ -572,8 +665,8 @@ router.delete('/notifications/delete/:id', (req, res) => {
     `DELETE FROM notifications WHERE id = ? AND student_id = ?`,
     [id, userId],
     (err) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      res.json({ Status: true, Message: "Deleted" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      res.json({ status: "success", message: "Deleted" });
     }
   );
 });
@@ -589,20 +682,20 @@ router.get('/achievements/all', (req, res) => {
      FROM achievements WHERE student_id = ?`,
     [userId],
     (err, results) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
 
       if (results.length === 0) {
         // No row yet — student hasn't done anything
         return res.json({
-          Status: true,
-          Result: { keys_earned: [], progress_map: {} }
+          status: "success",
+          data: { keys_earned: [], progress_map: {} }
         });
       }
 
       const row = results[0];
       res.json({
-        Status: true,
-        Result: {
+        status: "success",
+        data: {
           id:           row.id,
           keys_earned:  row.keys_earned ? row.keys_earned.split(',').filter(Boolean) : [],
           progress_map: row.progress_map || {},
@@ -626,7 +719,7 @@ router.get('/goals/current', (req, res) => {
      WHERE student_id = ? AND DATE(start_time) = CURDATE() AND status = 'completed'`,
     [userId],
     (err, minuteRows) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
       const actualMinutes = minuteRows[0]?.actual_minutes || 0;
 
       con.query(
@@ -636,7 +729,7 @@ router.get('/goals/current', (req, res) => {
          LIMIT 1`,
         [userId, today],
         (err2, goalRows) => {
-          if (err2) return res.status(500).json({ Status: false, Error: err2.message });
+          if (err2) return res.status(500).json({ status: "error", message: err2.message });
 
           if (goalRows.length === 0) {
             // No row for today — inherit the last target the student set, else default 120
@@ -646,7 +739,7 @@ router.get('/goals/current', (req, res) => {
                ORDER BY period_start DESC LIMIT 1`,
               [userId],
               (err3, lastGoal) => {
-                if (err3) return res.status(500).json({ Status: false, Error: err3.message });
+                if (err3) return res.status(500).json({ status: "error", message: err3.message });
                 const inheritedTarget = lastGoal.length > 0 ? lastGoal[0].target_minutes : 120;
                 const tomorrow = new Date();
                 tomorrow.setDate(tomorrow.getDate() + 1);
@@ -656,10 +749,10 @@ router.get('/goals/current', (req, res) => {
                    VALUES (?, 'daily', ?, ?, ?)`,
                   [userId, inheritedTarget, today, tomorrowStr],
                   (err4, insertResult) => {
-                    if (err4) return res.status(500).json({ Status: false, Error: err4.message });
+                    if (err4) return res.status(500).json({ status: "error", message: err4.message });
                     res.json({
-                      Status: true,
-                      Result: {
+                      status: "success",
+                      data: {
                         id: insertResult.insertId,
                         type: 'daily',
                         target_minutes: inheritedTarget,
@@ -674,8 +767,8 @@ router.get('/goals/current', (req, res) => {
             );
           } else {
             res.json({
-              Status: true,
-              Result: { ...goalRows[0], current_progress: actualMinutes }
+              status: "success",
+              data: { ...goalRows[0], current_progress: actualMinutes }
             });
           }
         }
@@ -692,7 +785,7 @@ router.put('/goals/target', (req, res) => {
 
   const target = Math.round(Number(targetMinutes));
   if (!target || target < 1 || target > 1440) {
-    return res.status(400).json({ Status: false, Error: "Target must be between 1 and 1440 minutes" });
+    return res.status(400).json({ status: "error", message: "Target must be between 1 and 1440 minutes" });
   }
 
   // Update today's goal row if it exists
@@ -701,7 +794,7 @@ router.put('/goals/target', (req, res) => {
      WHERE student_id = ? AND type = 'daily' AND ? BETWEEN period_start AND period_end`,
     [target, userId, today],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
 
       if (result.affectedRows === 0) {
         // No row yet — create it
@@ -714,12 +807,12 @@ router.put('/goals/target', (req, res) => {
            ON DUPLICATE KEY UPDATE target_minutes = VALUES(target_minutes)`,
           [userId, target, today, tomorrowStr],
           (err2) => {
-            if (err2) return res.status(500).json({ Status: false, Error: err2.message });
-            res.json({ Status: true, Message: "Daily goal set", target_minutes: target });
+            if (err2) return res.status(500).json({ status: "error", message: err2.message });
+            res.json({ status: "success", message: "Daily goal set", target_minutes: target });
           }
         );
       } else {
-        res.json({ Status: true, Message: "Daily goal updated", target_minutes: target });
+        res.json({ status: "success", message: "Daily goal updated", target_minutes: target });
       }
     }
   );
@@ -731,16 +824,16 @@ router.put('/goals/update/:id', (req, res) => {
   const { targetMinutes } = req.body;
 
   if (!targetMinutes || targetMinutes < 1) {
-    return res.status(400).json({ Status: false, Error: "targetMinutes must be at least 1" });
+    return res.status(400).json({ status: "error", message: "targetMinutes must be at least 1" });
   }
 
   con.query(
     `UPDATE study_goals SET target_minutes = ? WHERE id = ? AND student_id = ?`,
     [targetMinutes, id, userId],
     (err, result) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
-      if (result.affectedRows === 0) return res.status(404).json({ Status: false, Error: "Goal not found" });
-      res.json({ Status: true, Message: "Goal updated" });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ status: "error", message: "Goal not found" });
+      res.json({ status: "success", message: "Goal updated" });
     }
   );
 });
@@ -764,11 +857,11 @@ router.get('/dataroom/stats', (req, res) => {
      WHERE student_id = ? AND status = 'completed'`,
     [userId, userId],
     (err, rows) => {
-      if (err) return res.status(500).json({ Status: false, Error: err.message });
+      if (err) return res.status(500).json({ status: "error", message: err.message });
       const { total_minutes, total_sessions, total_courses, month_minutes } = rows[0];
       res.json({
-        Status: true,
-        Data: {
+        status: "success",
+        data: {
           totalStudyTime:   `${Math.floor(total_minutes / 60)}h ${total_minutes % 60}m`,
           totalSessions:    total_sessions,
           totalCourses:     total_courses,

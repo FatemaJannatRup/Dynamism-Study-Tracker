@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.get("/logout", (req, res) => {
   res.clearCookie("token");
-  return res.json({ Status: true, message: "Logged out" });
+  return res.json({ status: "success", message: "Logged out" });
 });
 
 export { router as logoutRouter };
