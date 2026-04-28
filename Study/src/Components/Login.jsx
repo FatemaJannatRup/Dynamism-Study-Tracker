@@ -1,18 +1,13 @@
 // Login.jsx
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import api from '../api.js';
 import './style.css';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-
-  const api = axios.create({
-    baseURL: 'http://localhost:3000',
-    withCredentials: true,
-  });
 
   const [isActive, setIsActive] = useState(false);
   const [loginValues, setLoginValues] = useState({ email: '', password: '' });

@@ -1,3 +1,4 @@
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -8,6 +9,8 @@ import { dashboardRouter } from "./Routes/dashboardRoute.js";
 import { adminRouter }     from "./Routes/admin.js";
 import { messagesRouter }  from "./Routes/Messagesroute.js";
 import path from "path";
+
+dotenv.config();
 
 const app = express();
 

@@ -7,13 +7,7 @@ import {
 } from 'recharts';
 import { format, subDays, parseISO } from 'date-fns';
 import './AdminDashboard.css';
-
-const api = axios.create({
-  baseURL: 'http://localhost:3000',
-  timeout: 8000,
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: true
-});
+import api from '../api.js';
 
 const COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
 

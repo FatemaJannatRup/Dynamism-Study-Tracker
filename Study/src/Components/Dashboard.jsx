@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api.js';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, Legend
@@ -12,13 +12,6 @@ import {
 } from 'date-fns';
 import { useAuth } from './AuthContext';
 import './Dashboard.css';
-
-const api = axios.create({
-  baseURL: 'http://localhost:3000',
-  timeout: 8000,
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: true,
-});
 
 const COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'];
 
