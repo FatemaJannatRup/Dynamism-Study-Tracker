@@ -7,7 +7,7 @@ import Logout from './Components/Logout';
 import Landing from './Components/Landing';
 import Contact from './Components/Contact';
 import FAQ from './Components/FAQ';
-import AboutUs from './Components/Aboutus';
+import AboutUs from './Components/AboutUs';
 import AdminDashboard from './Components/AdminDashboard';
 import { ProtectedRoute } from './Components/ProtectedRoute';
 
